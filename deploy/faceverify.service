@@ -1,0 +1,17 @@
+[Unit]
+Description=FaceVerify API + Static UI
+After=network.target
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/faceverify/app
+EnvironmentFile=/srv/faceverify/app/.env
+ExecStart=/srv/faceverify/venv/bin/uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1
+Restart=always
+RestartSec=5
+StandardOutput=append:/srv/faceverify/logs/app.log
+StandardError=append:/srv/faceverify/logs/app.err
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+models/
+.DS_Store
+.env
+.venv
+face_verify_venv
+app/.env
