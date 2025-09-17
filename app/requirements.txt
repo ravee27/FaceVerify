@@ -11,3 +11,4 @@ scikit-image==0.24.*
 torch==2.3.*
 onnxruntime-gpu==1.18.* ; sys_platform == 'linux'
 onnxruntime==1.18.* ; sys_platform != 'linux'
+ultralytics==8.3.54

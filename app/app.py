@@ -26,6 +26,19 @@ from embedder import get_embedder_info
 from retinaface_wrapper import detect_and_align
 from retinaface_wrapper import detect_with_bbox_and_align
 from stream_manager import StreamManager
+from ultralytics import YOLO
+
+_GUN_MODEL = None
+
+
+def load_gun_model():
+    global _GUN_MODEL
+    if _GUN_MODEL is None:
+        # default path
+        model_path = os.getenv("GUN_MODEL_PATH", os.path.join(os.path.dirname(__file__), "..", "models", "gun", "yolo_11L_70K.pt"))
+        _GUN_MODEL = YOLO(model_path)
+    return _GUN_MODEL
+
 
 # ===== App init =====
 app = FastAPI(title="FaceVerify", version="1.0")
@@ -364,6 +377,122 @@ def api_info():
         },
         "model": get_embedder_info(),
     }
+
+
+@app.post(f"{API_PREFIX}/gun/detect-image")
+async def gun_detect_image(img: UploadFile = File(...), conf: float = Form(0.35)):
+    raw = img.file.read()
+    bgr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+    if bgr is None:
+        raise HTTPException(400, "Invalid image")
+    model = load_gun_model()
+    res = model.predict(bgr[:, :, ::-1], conf=conf, verbose=False)[0]
+    boxes = []
+    for b in (res.boxes or []):
+        x1, y1, x2, y2 = [int(v) for v in b.xyxy[0].tolist()]
+        cls_id = int(b.cls.item()) if b.cls is not None else -1
+        score = float(b.conf.item()) if b.conf is not None else 0.0
+        boxes.append({"bbox": [x1, y1, x2, y2], "cls": cls_id, "score": score})
+        cv2.rectangle(bgr, (x1, y1), (x2, y2), (0,200,0), 2)
+        cv2.putText(bgr, f"{score*100:.0f}%", (x1, y1-6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,200,0), 2, cv2.LINE_AA)
+    ok, buf = cv2.imencode('.jpg', bgr)
+    if not ok:
+        raise HTTPException(500, "Failed to encode result")
+    return {"items": boxes, "preview_jpeg_b64": base64.b64encode(buf.tobytes()).decode('ascii')}
+
+
+_GUN_JOBS: Dict[str, dict] = {}
+
+@app.post(f"{API_PREFIX}/gun/detect-video")
+async def gun_detect_video(video: UploadFile = File(...), conf: float = Form(0.35)):
+    raw = await video.read()
+    job_id = str(uuid.uuid4())
+    path = f"/tmp/{job_id}.mp4"
+    with open(path, "wb") as f:
+        f.write(raw)
+    _GUN_JOBS[job_id] = {"status": "running", "video_path": path, "conf": conf}
+    return {"job_id": job_id, "status": "queued"}
+
+
+def _gun_mjpeg_generator(video_path: str, conf: float):
+    model = load_gun_model()
+    cap = cv2.VideoCapture(video_path)
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        res = model.predict(frame[:, :, ::-1], conf=conf, verbose=False)[0]
+        for b in (res.boxes or []):
+            x1, y1, x2, y2 = [int(v) for v in b.xyxy[0].tolist()]
+            score = float(b.conf.item()) if b.conf is not None else 0.0
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0,200,0), 2)
+            cv2.putText(frame, f"{score*100:.0f}%", (x1, y1-6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,200,0), 2, cv2.LINE_AA)
+        ok, buf = cv2.imencode('.jpg', frame)
+        if not ok:
+            continue
+        jpg = buf.tobytes()
+        yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n")
+    cap.release()
+
+@app.get(f"{API_PREFIX}/gun/preview-video/{{job_id}}")
+def gun_preview_video(job_id: str):
+    job = _GUN_JOBS.get(job_id)
+    if not job or "video_path" not in job:
+        raise HTTPException(404, "Job not found")
+    return StreamingResponse(_gun_mjpeg_generator(job["video_path"], float(job.get("conf", 0.35))), media_type='multipart/x-mixed-replace; boundary=frame')
+
+@app.post(f"{API_PREFIX}/weapon/detect-image")
+async def weapon_detect_image(img: UploadFile = File(...), conf: float = Form(0.35)):
+    return await gun_detect_image(img=img, conf=conf)
+
+@app.post(f"{API_PREFIX}/weapon/detect-video")
+async def weapon_detect_video(video: UploadFile = File(...), conf: float = Form(0.35)):
+    return await gun_detect_video(video=video, conf=conf)
+
+@app.get(f"{API_PREFIX}/weapon/preview-video/{{job_id}}")
+def weapon_preview_video(job_id: str):
+    return gun_preview_video(job_id)
+
+
+def _weapon_rtsp_generator(rtsp_url: str, conf: float):
+    model = load_gun_model()
+    cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        res = model.predict(frame[:, :, ::-1], conf=conf, verbose=False)[0]
+        for b in (res.boxes or []):
+            x1, y1, x2, y2 = [int(v) for v in b.xyxy[0].tolist()]
+            score = float(b.conf.item()) if b.conf is not None else 0.0
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0,200,0), 2)
+            cv2.putText(frame, f"{score*100:.0f}%", (x1, y1-6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,200,0), 2, cv2.LINE_AA)
+        ok, buf = cv2.imencode('.jpg', frame)
+        if not ok:
+            continue
+        jpg = buf.tobytes()
+        yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n")
+    cap.release()
+
+@app.get(f"{API_PREFIX}/weapon/preview-rtsp")
+def weapon_preview_rtsp(rtsp_url: str, conf: float = 0.35):
+    if not rtsp_url:
+        raise HTTPException(400, "rtsp_url is required")
+    return StreamingResponse(_weapon_rtsp_generator(rtsp_url, conf), media_type='multipart/x-mixed-replace; boundary=frame')
+
+@app.get(f"{API_PREFIX}/routes")
+def list_routes():
+    paths = []
+    try:
+        for r in app.routes:
+            if hasattr(r, 'path'):
+                paths.append({
+                    "path": getattr(r, 'path', ''),
+                    "methods": list(getattr(r, 'methods', []))
+                })
+    except Exception:
+        pass
+    return {"paths": paths}
 
 
 if __name__ == "__main__":

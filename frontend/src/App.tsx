@@ -8,8 +8,12 @@ import Toast from './components/Toast'
 
 const API = import.meta.env.VITE_API_BASE || ''
 
+type Mode = 'face' | 'weapon'
+
 export default function App() {
+  const [mode, setMode] = useState<Mode>('face')
   const [tab, setTab] = useState<'img'|'video'|'live'>('img')
+  const [weaponTab, setWeaponTab] = useState<'img'|'video'|'live'>('img')
   const [toast, setToast] = useState<string>('')
   const [info, setInfo] = useState<any>(null)
   const [showApi, setShowApi] = useState(false)
@@ -31,49 +35,68 @@ export default function App() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="flex items-baseline justify-between">
+      <div className="mb-4 p-4 bg-white border border-slate-200 rounded-xl flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-800">FaceVerify</h1>
-          <p className="text-slate-600 mt-1">Compare faces across images, video, and RTSP streams.</p>
+          <h1 className="text-2xl font-semibold text-slate-800">Computer Vision Toolkit</h1>
+          <p className="text-slate-600 mt-1">Select a mode to get started.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={()=>setMode('face')} className={`px-4 py-2 rounded-full border ${mode==='face'?'bg-blue-600 text-white border-blue-600':'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}>Face Verify</button>
+          <button onClick={()=>setMode('weapon')} className={`px-4 py-2 rounded-full border ${mode==='weapon'?'bg-blue-600 text-white border-blue-600':'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}>Weapon Detection</button>
         </div>
       </div>
 
-      <div className="mt-6">
-        <Tabs tabs={[{key:'img',label:'Images'},{key:'video',label:'Video vs Ref'},{key:'live',label:'Live RTSP'}]} active={tab} onChange={(k)=>setTab(k as any)} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 mb-6">
-        <Card title="Service Info">
-          {info ? (
-            <div className="text-sm text-slate-700 space-y-1">
-              <div><span className="text-slate-500">API:</span> v{info.api?.version}</div>
-              <div><span className="text-slate-500">Profiles:</span> {Array.isArray(info.api?.profiles) ? info.api.profiles.join(', ') : '-'}</div>
-              <div><span className="text-slate-500">Max streams:</span> {info.api?.max_streams ?? '-'}</div>
-            </div>
-          ) : <div className="text-slate-400">Loading…</div>}
-        </Card>
-        <Card title="Model Info">
-          {info ? (
-            <div className="text-sm text-slate-700 space-y-1">
-              <div><span className="text-slate-500">Backbone:</span> {info.model?.arch ?? '-'}</div>
-              <div><span className="text-slate-500">Class:</span> {info.model?.model_class ?? '-'}</div>
-              <div><span className="text-slate-500">Device:</span> {info.model?.device ?? '-'}</div>
-              <div><span className="text-slate-500">Torch:</span> {info.model?.torch ?? '-'}</div>
-              <div><span className="text-slate-500">From:</span> {info.model?.state_dict ? 'state_dict' : (info.model?.torchscript ? 'torchscript' : '-')}</div>
-            </div>
-          ) : <div className="text-slate-400">Loading…</div>}
-        </Card>
-        <Card title="Status">
-          <div className="text-sm text-slate-700">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 align-middle mr-2"></span>
-            <span>Ready</span>
+      {mode==='face' && (
+        <>
+          <div className="mt-2">
+            <Tabs tabs={[{key:'img',label:'Images'},{key:'video',label:'Video vs Ref'},{key:'live',label:'Live RTSP'}]} active={tab} onChange={(k)=>setTab(k as any)} />
           </div>
-        </Card>
-      </div>
 
-      {tab==='img' && <ImagesPanel setToast={setToast} />}
-      {tab==='video' && <VideoPanel setToast={setToast} />}
-      {tab==='live' && <LivePanel setToast={setToast} />}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 mb-6">
+            <Card title="Service Info">
+              {info ? (
+                <div className="text-sm text-slate-700 space-y-1">
+                  <div><span className="text-slate-500">API:</span> v{info.api?.version}</div>
+                  <div><span className="text-slate-500">Profiles:</span> {Array.isArray(info.api?.profiles) ? info.api.profiles.join(', ') : '-'}</div>
+                  <div><span className="text-slate-500">Max streams:</span> {info.api?.max_streams ?? '-'}</div>
+                </div>
+              ) : <div className="text-slate-400">Loading…</div>}
+            </Card>
+            <Card title="Model Info">
+              {info ? (
+                <div className="text-sm text-slate-700 space-y-1">
+                  <div><span className="text-slate-500">Backbone:</span> {info.model?.arch ?? '-'}</div>
+                  <div><span className="text-slate-500">Class:</span> {info.model?.model_class ?? '-'}</div>
+                  <div><span className="text-slate-500">Device:</span> {info.model?.device ?? '-'}</div>
+                  <div><span className="text-slate-500">Torch:</span> {info.model?.torch ?? '-'}</div>
+                  <div><span className="text-slate-500">From:</span> {info.model?.state_dict ? 'state_dict' : (info.model?.torchscript ? 'torchscript' : '-')}</div>
+                </div>
+              ) : <div className="text-slate-400">Loading…</div>}
+            </Card>
+            <Card title="Status">
+              <div className="text-sm text-slate-700">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 align-middle mr-2"></span>
+                <span>Ready</span>
+              </div>
+            </Card>
+          </div>
+
+          {tab==='img' && <ImagesPanel setToast={setToast} />}
+          {tab==='video' && <VideoPanel setToast={setToast} />}
+          {tab==='live' && <LivePanel setToast={setToast} />}
+        </>
+      )}
+
+      {mode==='weapon' && (
+        <>
+          <div className="mt-2">
+            <Tabs tabs={[{key:'img',label:'Images'},{key:'video',label:'Video'},{key:'live',label:'Live RTSP'}]} active={weaponTab} onChange={(k)=>setWeaponTab(k as any)} />
+          </div>
+          {weaponTab==='img' && <WeaponImagePanel setToast={setToast} />}
+          {weaponTab==='video' && <WeaponVideoPanel setToast={setToast} />}
+          {weaponTab==='live' && <WeaponLivePanel setToast={setToast} />}
+        </>
+      )}
 
       <div className="mt-8">
         <Card title="API Endpoints" action={<button className="text-sm px-3 py-1 border rounded" onClick={()=>setShowApi(v=>!v)}>{showApi? 'Hide' : 'Show'} details</button>}>
@@ -107,16 +130,17 @@ export default function App() {
                 <pre className="mt-1 bg-slate-50 p-2 rounded border overflow-auto"><code>{`curl -s ${displayBase}/api/jobs/<job_id>`}</code></pre>
               </div>
               <div>
-                <div className="font-semibold">Live RTSP Streams</div>
-                <div className="text-slate-500">List streams</div>
-                <pre className="mt-1 bg-slate-50 p-2 rounded border overflow-auto"><code>{`curl -s ${displayBase}/api/streams`}</code></pre>
-                <div className="text-slate-500">Add stream</div>
-                <pre className="mt-1 bg-slate-50 p-2 rounded border overflow-auto"><code>{`curl -X POST ${displayBase}/api/streams \
-  -F rtsp_url="rtsp://user:pass@host:554/path" \
-  -F label="Cam 1" \
-  -F sampling_fps=3`}</code></pre>
-                <div className="text-slate-500">Delete stream</div>
-                <pre className="mt-1 bg-slate-50 p-2 rounded border overflow-auto"><code>{`curl -X DELETE ${displayBase}/api/streams/<stream_id>`}</code></pre>
+                <div className="font-semibold">Weapon Detection</div>
+                <div className="text-slate-500">POST {displayBase}/api/weapon/detect-image</div>
+                <pre className="mt-1 bg-slate-50 p-2 rounded border overflow-auto"><code>{`curl -X POST ${displayBase}/api/weapon/detect-image \
+  -F img=@/path/image.jpg \
+  -F conf=0.35`}</code></pre>
+                <div className="text-slate-500">POST {displayBase}/api/weapon/detect-video</div>
+                <pre className="mt-1 bg-slate-50 p-2 rounded border overflow-auto"><code>{`curl -X POST ${displayBase}/api/weapon/detect-video \
+  -F video=@/path/clip.mp4 \
+  -F conf=0.35`}</code></pre>
+                <div className="text-slate-500">GET {displayBase}/api/weapon/preview-video/&lt;job_id&gt;</div>
+                <div className="text-slate-500">GET {displayBase}/api/weapon/preview-rtsp?rtsp_url=rtsp://…</div>
               </div>
               <div>
                 <div className="font-semibold">Service/Model Info</div>
@@ -342,6 +366,119 @@ function LivePanel({ setToast }: { setToast: (s:string)=>void }) {
       </Card>
       <Card title="Live Scores">
         {selected ? <StreamViewer streamId={selected} /> : <div className="text-slate-500">Select a stream</div>}
+      </Card>
+    </div>
+  )
+}
+
+function WeaponImagePanel({ setToast }: { setToast: (s:string)=>void }) {
+  const [img, setImg] = useState<File | null>(null)
+  const [res, setRes] = useState<any>(null)
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
+    if (!img) return setToast('Select an image')
+    setBusy(true)
+    const fd = new FormData()
+    fd.append('img', img)
+    fd.append('conf', String(0.35))
+    try {
+      const r = await fetch(`${API}/api/weapon/detect-image`, { method: 'POST', body: fd })
+      if (!r.ok) throw new Error(await r.text())
+      setRes(await r.json())
+    } catch (e:any) { setToast(e.message || 'Request failed') }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <Card title="Image">
+        <div className="space-y-4">
+          <UploadBox label={img? img.name : 'Click to upload'} onFile={setImg} />
+          <button className={`px-4 py-2 rounded bg-blue-600 text-white ${busy?'opacity-50':''}`} disabled={busy} onClick={submit}>Detect Weapon</button>
+          <div className="text-xs text-slate-500">Upload an image and click Detect to see bounding boxes and confidence.</div>
+        </div>
+      </Card>
+      <div className="md:col-span-2">
+        <Card title="Detection Result" action={res?.items?.length ? <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">{res.items.length} detections</span> : undefined}>
+          <div className="w-full flex justify-center">
+            {res?.preview_jpeg_b64 ? (
+              <img className="max-w-4xl w-full rounded border" src={`data:image/jpeg;base64,${res.preview_jpeg_b64}`} />
+            ) : (
+              <div className="text-slate-500 text-sm p-6">No result</div>
+            )}
+          </div>
+          <div className="text-sm text-slate-700 mt-4">
+            <div className="font-semibold mb-2">Detections</div>
+            {Array.isArray(res?.items) && res.items.length ? (
+              <ul className="list-disc ml-5 space-y-1">
+                {res.items.map((x:any,i:number)=> <li key={i}>[{x.bbox.join(', ')}] — {(x.score*100).toFixed(0)}%</li>)}
+              </ul>
+            ) : <div className="text-slate-500">None</div>}
+          </div>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+function WeaponVideoPanel({ setToast }: { setToast: (s:string)=>void }) {
+  const [video, setVideo] = useState<File | null>(null)
+  const [job, setJob] = useState<any>(null)
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
+    if (!video) return setToast('Select a video')
+    setBusy(true)
+    const fd = new FormData()
+    fd.append('video', video)
+    fd.append('conf', String(0.35))
+    try {
+      const r = await fetch(`${API}/api/weapon/detect-video`, { method: 'POST', body: fd })
+      if (!r.ok) throw new Error(await r.text())
+      setJob(await r.json())
+    } catch (e:any) { setToast(e.message || 'Request failed') }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <Card title="Video">
+        <div className="space-y-4">
+          <UploadBox label={video? video.name : 'Click to upload a video'} onFile={setVideo} />
+          <button className={`px-4 py-2 rounded bg-blue-600 text-white ${busy?'opacity-50':''}`} disabled={busy} onClick={submit}>Detect Weapon</button>
+          <div className="text-xs text-slate-500">Upload a clip and view live annotated results on the right.</div>
+        </div>
+      </Card>
+      <div className="md:col-span-2">
+        <Card title="Live Preview (annotated)">
+          {job?.job_id ? (
+            <div className="w-full flex justify-center">
+              <img className="max-w-4xl w-full rounded border" src={`${API}/api/weapon/preview-video/${job.job_id}`} />
+            </div>
+          ) : <div className="text-slate-500">Upload a video to start detection</div>}
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+function WeaponLivePanel({ setToast }: { setToast: (s:string)=>void }) {
+  const [url, setUrl] = useState('')
+  const [conf, setConf] = useState(0.35)
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Card title="RTSP Source">
+        <div className="space-y-3">
+          <input className="w-full border rounded px-3 py-2" placeholder="rtsp://user:pass@host:port/…" value={url} onChange={e=>setUrl(e.target.value)} />
+          <div className="flex items-center gap-2">
+            <label>Conf</label>
+            <input className="w-24 border rounded px-2 py-1" type="number" min={0.1} max={0.8} step={0.05} value={conf} onChange={e=>setConf(Number(e.target.value))} />
+          </div>
+        </div>
+      </Card>
+      <Card title="Live Preview (annotated)">
+        {url ? (
+          <div className="w-full flex justify-center">
+            <img className="max-w-4xl w-full rounded border" src={`${API}/api/weapon/preview-rtsp?rtsp_url=${encodeURIComponent(url)}&conf=${conf}`} />
+          </div>
+        ) : <div className="text-slate-500">Enter RTSP URL to start</div>}
       </Card>
     </div>
   )
