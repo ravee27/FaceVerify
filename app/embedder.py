@@ -105,6 +105,7 @@ def _load_from_state_dict(device: torch.device) -> bool:
 def load_embedder(device: str = "cuda:0"):
     global _DEVICE, _MODEL
     _DEVICE = torch.device(device if torch.cuda.is_available() else "cpu")
+    print(f"Embedder: torch.cuda.is_available(): {torch.cuda.is_available()}, requested device: {device}, using device: {_DEVICE}")
 
     # Try state_dict first if provided, else TorchScript
     loaded = False

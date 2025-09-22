@@ -29,13 +29,17 @@ from stream_manager import StreamManager
 from ultralytics import YOLO
 
 _GUN_MODEL = None
+GUN_CONF = 0.45
 
 
 def load_gun_model():
     global _GUN_MODEL
     if _GUN_MODEL is None:
         # default path
-        model_path = os.getenv("GUN_MODEL_PATH", os.path.join(os.path.dirname(__file__), "..", "models", "gun", "yolo_11L_70K.pt"))
+        model_path = os.getenv("GUN_MODEL_PATH", os.path.join(os.path.dirname(__file__), "..", "models", "gun", "best.pt"))
+        print("--------------------------------"*3)
+        print(f"Model path: {model_path}")
+        print("--------------------------------"*3)
         _GUN_MODEL = YOLO(model_path)
     return _GUN_MODEL
 
@@ -380,7 +384,7 @@ def api_info():
 
 
 @app.post(f"{API_PREFIX}/gun/detect-image")
-async def gun_detect_image(img: UploadFile = File(...), conf: float = Form(0.35)):
+async def gun_detect_image(img: UploadFile = File(...), conf: float = Form(GUN_CONF)):
     raw = img.file.read()
     bgr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
     if bgr is None:
@@ -404,7 +408,7 @@ async def gun_detect_image(img: UploadFile = File(...), conf: float = Form(0.35)
 _GUN_JOBS: Dict[str, dict] = {}
 
 @app.post(f"{API_PREFIX}/gun/detect-video")
-async def gun_detect_video(video: UploadFile = File(...), conf: float = Form(0.35)):
+async def gun_detect_video(video: UploadFile = File(...), conf: float = Form(GUN_CONF)):
     raw = await video.read()
     job_id = str(uuid.uuid4())
     path = f"/tmp/{job_id}.mp4"
@@ -439,14 +443,14 @@ def gun_preview_video(job_id: str):
     job = _GUN_JOBS.get(job_id)
     if not job or "video_path" not in job:
         raise HTTPException(404, "Job not found")
-    return StreamingResponse(_gun_mjpeg_generator(job["video_path"], float(job.get("conf", 0.35))), media_type='multipart/x-mixed-replace; boundary=frame')
+    return StreamingResponse(_gun_mjpeg_generator(job["video_path"], float(job.get("conf", GUN_CONF))), media_type='multipart/x-mixed-replace; boundary=frame')
 
 @app.post(f"{API_PREFIX}/weapon/detect-image")
-async def weapon_detect_image(img: UploadFile = File(...), conf: float = Form(0.35)):
+async def weapon_detect_image(img: UploadFile = File(...), conf: float = Form(GUN_CONF)):
     return await gun_detect_image(img=img, conf=conf)
 
 @app.post(f"{API_PREFIX}/weapon/detect-video")
-async def weapon_detect_video(video: UploadFile = File(...), conf: float = Form(0.35)):
+async def weapon_detect_video(video: UploadFile = File(...), conf: float = Form(GUN_CONF)):
     return await gun_detect_video(video=video, conf=conf)
 
 @app.get(f"{API_PREFIX}/weapon/preview-video/{{job_id}}")
@@ -475,7 +479,7 @@ def _weapon_rtsp_generator(rtsp_url: str, conf: float):
     cap.release()
 
 @app.get(f"{API_PREFIX}/weapon/preview-rtsp")
-def weapon_preview_rtsp(rtsp_url: str, conf: float = 0.35):
+def weapon_preview_rtsp(rtsp_url: str, conf: float = GUN_CONF):
     if not rtsp_url:
         raise HTTPException(400, "rtsp_url is required")
     return StreamingResponse(_weapon_rtsp_generator(rtsp_url, conf), media_type='multipart/x-mixed-replace; boundary=frame')

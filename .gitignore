@@ -4,3 +4,4 @@ models/
 .venv
 face_verify_venv
 app/.env
+api_venv

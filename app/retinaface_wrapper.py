@@ -28,11 +28,41 @@ def _estimate_norm(lmk: np.ndarray, image_size: int = 112) -> np.ndarray:
     return M.astype(np.float32)
 
 
+# def init_detector():
+#     global _DET
+#     if _DET is None:
+#         app = insightface.app.FaceAnalysis(name="buffalo_l")
+#         app.prepare(ctx_id=0, det_size=(640, 640))
+#         _DET = app
+#     return _DET
+
 def init_detector():
     global _DET
     if _DET is None:
-        app = insightface.app.FaceAnalysis(name="buffalo_l")
-        app.prepare(ctx_id=0, det_size=(640, 640))
+        import os
+        try:
+            import onnxruntime as ort
+        except Exception:
+            ort = None
+
+        name = os.getenv("INSIGHTFACE_NAME", "buffalo_l")  # e.g., buffalo_l (accurate) or buffalo_sc (faster)
+        det_w = int(os.getenv("INSIGHTFACE_DET_W", "640"))
+        det_h = int(os.getenv("INSIGHTFACE_DET_H", "640"))
+
+        providers = None
+        ctx_id = 0
+        if ort is not None:
+            avail = ort.get_available_providers()
+            print(f"InsightFace/ONNX providers available: {avail}")
+            if "CUDAExecutionProvider" in avail:
+                providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+                ctx_id = 0
+            else:
+                providers = ["CPUExecutionProvider"]
+                ctx_id = -1
+
+        app = insightface.app.FaceAnalysis(name=name, providers=providers)
+        app.prepare(ctx_id=ctx_id, det_size=(det_w, det_h))
         _DET = app
     return _DET
 
