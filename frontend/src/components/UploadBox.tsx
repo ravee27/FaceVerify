@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import React, { useRef } from 'react'
 
 export default function UploadBox({ label, onFile }: { label: string, onFile: (f: File) => void }) {
   const ref = useRef<HTMLInputElement>(null)

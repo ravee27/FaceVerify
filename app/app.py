@@ -29,7 +29,7 @@ from stream_manager import StreamManager
 from ultralytics import YOLO
 
 _GUN_MODEL = None
-GUN_CONF = 0.45
+GUN_CONF = 0.35
 
 
 def load_gun_model():
@@ -421,10 +421,19 @@ async def gun_detect_video(video: UploadFile = File(...), conf: float = Form(GUN
 def _gun_mjpeg_generator(video_path: str, conf: float):
     model = load_gun_model()
     cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+    try:
+        fps = float(fps)
+    except Exception:
+        fps = 0.0
+    frame_interval = 1.0 / max(fps, 1.0) if fps and fps > 0 else None
+    # Synchronize playback to video timestamps when available
+    t0_sync = None  # wall-clock offset so that target_time = t0_sync + video_pos
     while True:
         ok, frame = cap.read()
         if not ok:
             break
+        pos_ms = cap.get(cv2.CAP_PROP_POS_MSEC) or 0.0
         res = model.predict(frame[:, :, ::-1], conf=conf, verbose=False)[0]
         for b in (res.boxes or []):
             x1, y1, x2, y2 = [int(v) for v in b.xyxy[0].tolist()]
@@ -435,6 +444,21 @@ def _gun_mjpeg_generator(video_path: str, conf: float):
         if not ok:
             continue
         jpg = buf.tobytes()
+        # Pace frames to approximately source rate using POS_MSEC if available, else FPS fallback
+        now = time.time()
+        if pos_ms and pos_ms > 0:
+            if t0_sync is None:
+                t0_sync = now - (pos_ms / 1000.0)
+            target = t0_sync + (pos_ms / 1000.0)
+            if target > now:
+                time.sleep(min(0.25, target - now))
+        elif frame_interval is not None:
+            # FPS-based fallback
+            if 'next_ts' not in locals():
+                next_ts = now + frame_interval
+            if next_ts > now:
+                time.sleep(min(0.25, next_ts - now))
+            next_ts += frame_interval
         yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n")
     cap.release()
 
@@ -461,6 +485,13 @@ def weapon_preview_video(job_id: str):
 def _weapon_rtsp_generator(rtsp_url: str, conf: float):
     model = load_gun_model()
     cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    try:
+        fps = float(fps)
+    except Exception:
+        fps = 25.0
+    frame_interval = 1.0 / max(fps, 1.0)
+    next_ts = time.time() + frame_interval
     while True:
         ok, frame = cap.read()
         if not ok:
@@ -475,6 +506,11 @@ def _weapon_rtsp_generator(rtsp_url: str, conf: float):
         if not ok:
             continue
         jpg = buf.tobytes()
+        # Pace frames to approximately source FPS
+        now = time.time()
+        if next_ts > now:
+            time.sleep(next_ts - now)
+        next_ts += frame_interval
         yield (b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n")
     cap.release()
 

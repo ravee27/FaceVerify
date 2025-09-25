@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import React, { ReactNode } from 'react'
 
 export default function Card({ title, children, action }: { title: string, children: ReactNode, action?: ReactNode }) {
   return (
